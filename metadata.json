@@ -1,0 +1,5 @@
+{
+  "name": "SnapCal",
+  "description": "A smart calorie tracker that estimates nutrition from food photos using Gemini AI.",
+  "requestFramePermissions": []
+}
