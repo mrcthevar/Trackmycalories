@@ -8,6 +8,8 @@ export interface Nutrition {
   water: number; // in grams/ml
 }
 
+export type MealType = 'Breakfast' | 'Lunch' | 'Dinner' | 'Snack';
+
 export interface FoodEntry {
   id: string;
   name: string;
@@ -17,6 +19,7 @@ export interface FoodEntry {
   timestamp: number;
   imageUrl?: string;
   source?: 'image' | 'text' | 'label' | 'water';
+  mealType: MealType;
 }
 
 export interface UserProfile {

@@ -74,7 +74,7 @@ const DateSelector: React.FC<DateSelectorProps> = ({ selectedDate, onDateChange 
             />
             <button className="flex items-center gap-2 px-4 py-1.5 rounded-lg hover:bg-slate-50 transition-colors">
                 <CalendarIcon size={16} className="text-indigo-600" />
-                <span className="font-semibold text-slate-700 min-w-[5rem] text-center">
+                <span className="font-bold text-slate-700 min-w-[5rem] text-center">
                     {formatDisplayDate(selectedDate)}
                 </span>
             </button>
