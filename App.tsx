@@ -35,7 +35,6 @@ const App: React.FC = () => {
       localStorage.setItem('trackmycalories_entries', JSON.stringify(entries));
     } catch (e) {
       console.error("LocalStorage quota exceeded or error saving", e);
-      // Optional: Alert user or remove oldest entries, but for now just preventing crash
       if (entries.length > 0) {
           alert("Warning: Storage full. Some older data might not be saved.");
       }
@@ -51,7 +50,6 @@ const App: React.FC = () => {
   // --- Handlers ---
   const addEntry = (entry: FoodEntry) => {
     setEntries(prev => [...prev, entry]);
-    // Always jump back to today when adding a new entry so the user sees it
     setSelectedDate(new Date());
   };
 
@@ -65,7 +63,6 @@ const App: React.FC = () => {
 
   // --- Derived State ---
   const displayedEntries = useMemo(() => {
-    // Normalize selected date to midnight
     const targetDate = new Date(selectedDate);
     targetDate.setHours(0, 0, 0, 0);
     const targetTime = targetDate.getTime();
@@ -84,8 +81,12 @@ const App: React.FC = () => {
         protein: acc.protein + curr.nutrition.protein,
         carbs: acc.carbs + curr.nutrition.carbs,
         fat: acc.fat + curr.nutrition.fat,
+        // Aggregating new metrics safely (handling legacy data that might miss these fields)
+        fiber: (acc.fiber || 0) + (curr.nutrition.fiber || 0),
+        sugar: (acc.sugar || 0) + (curr.nutrition.sugar || 0),
+        water: (acc.water || 0) + (curr.nutrition.water || 0),
       }),
-      { calories: 0, protein: 0, carbs: 0, fat: 0 }
+      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, water: 0 }
     );
   }, [displayedEntries]);
 
@@ -100,14 +101,14 @@ const App: React.FC = () => {
       <div className="max-w-md mx-auto min-h-screen flex flex-col bg-white sm:shadow-2xl sm:shadow-slate-200 overflow-hidden relative">
         
         {/* Header */}
-        <header className="px-6 pt-8 pb-4 flex items-center justify-between bg-white z-10 sticky top-0">
+        <header className="px-6 pt-8 pb-4 flex items-center justify-between bg-white z-10 sticky top-0 border-b border-slate-50">
           <div className="flex items-center gap-2">
-            <div className="bg-indigo-600 p-2 rounded-xl text-white">
+            <div className="bg-indigo-600 p-2 rounded-xl text-white shadow-lg shadow-indigo-200">
                 <Activity size={20} />
             </div>
             <h1 className="text-xl font-bold tracking-tight text-slate-900">TrackMyCalories</h1>
           </div>
-          <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 overflow-hidden">
+          <div className="h-9 w-9 rounded-full bg-slate-100 border-2 border-white shadow-sm overflow-hidden ring-1 ring-slate-100">
              <img 
                src={`https://api.dicebear.com/7.x/notionists/svg?seed=${userName}&backgroundColor=e0e7ff`} 
                alt="User" 
@@ -120,7 +121,7 @@ const App: React.FC = () => {
         <main className="flex-1 px-6 py-4 overflow-y-auto no-scrollbar scroll-smooth">
           <div className="mb-6">
             <h2 className="text-2xl font-bold text-slate-900 mb-1">Hello, {userName}</h2>
-            <p className="text-slate-500">Track your meals for a healthier day.</p>
+            <p className="text-slate-500 text-sm">Let's check your nutrition stats today.</p>
           </div>
 
           <DateSelector 

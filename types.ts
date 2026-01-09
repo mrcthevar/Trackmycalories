@@ -3,6 +3,9 @@ export interface Nutrition {
   protein: number;
   carbs: number;
   fat: number;
+  sugar: number;
+  fiber: number;
+  water: number; // in grams/ml
 }
 
 export interface FoodEntry {
@@ -10,6 +13,7 @@ export interface FoodEntry {
   name: string;
   description?: string;
   nutrition: Nutrition;
+  healthTip?: string;
   timestamp: number;
   imageUrl?: string;
 }
@@ -17,8 +21,12 @@ export interface FoodEntry {
 export interface AnalysisResult {
   foodName: string;
   description: string;
+  healthTip: string;
   calories: number;
   protein: number;
   carbs: number;
   fat: number;
+  sugar: number;
+  fiber: number;
+  water: number;
 }
