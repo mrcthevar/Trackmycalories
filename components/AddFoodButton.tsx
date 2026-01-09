@@ -91,8 +91,10 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
     try {
       const analysis = await analyzeFoodImage(imagePreview);
       setResult(analysis);
-    } catch (err) {
-      setError("Failed to analyze image. Please try again.");
+    } catch (err: any) {
+      // Show the actual error message if available (helps with API Key debugging)
+      const errorMessage = err?.message || "Failed to analyze image. Please try again.";
+      setError(errorMessage);
     } finally {
       setIsAnalyzing(false);
     }
@@ -190,7 +192,7 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
               )}
 
               {error && (
-                <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm text-center mb-4">
+                <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm text-center mb-4 break-words">
                   {error}
                 </div>
               )}
