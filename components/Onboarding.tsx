@@ -25,7 +25,7 @@ const Onboarding: React.FC<OnboardingProps> = ({ onComplete }) => {
           <div className="mx-auto w-20 h-20 bg-indigo-100 rounded-3xl flex items-center justify-center text-indigo-600 mb-6 shadow-sm transform rotate-3">
             <ChefHat size={40} />
           </div>
-          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome to SnapCal</h1>
+          <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Welcome to TrackMyCalories</h1>
           <p className="text-slate-500 text-lg">
             Your personal AI nutrition assistant. <br />
             Let's get to know you.

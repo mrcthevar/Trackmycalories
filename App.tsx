@@ -12,13 +12,13 @@ const DAILY_CALORIE_GOAL = 2500;
 const App: React.FC = () => {
   // --- State: User Profile ---
   const [userName, setUserName] = useState<string | null>(() => {
-    return localStorage.getItem('snapcal_username');
+    return localStorage.getItem('trackmycalories_username');
   });
 
   // --- State: Data ---
   const [entries, setEntries] = useState<FoodEntry[]>(() => {
     try {
-      const saved = localStorage.getItem('snapcal_entries');
+      const saved = localStorage.getItem('trackmycalories_entries');
       return saved ? JSON.parse(saved) : [];
     } catch (e) {
       console.error("Failed to load entries from storage", e);
@@ -32,7 +32,7 @@ const App: React.FC = () => {
   // --- Effects ---
   useEffect(() => {
     try {
-      localStorage.setItem('snapcal_entries', JSON.stringify(entries));
+      localStorage.setItem('trackmycalories_entries', JSON.stringify(entries));
     } catch (e) {
       console.error("LocalStorage quota exceeded or error saving", e);
       // Optional: Alert user or remove oldest entries, but for now just preventing crash
@@ -44,7 +44,7 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (userName) {
-      localStorage.setItem('snapcal_username', userName);
+      localStorage.setItem('trackmycalories_username', userName);
     }
   }, [userName]);
 
@@ -105,7 +105,7 @@ const App: React.FC = () => {
             <div className="bg-indigo-600 p-2 rounded-xl text-white">
                 <Activity size={20} />
             </div>
-            <h1 className="text-xl font-bold tracking-tight text-slate-900">SnapCal</h1>
+            <h1 className="text-xl font-bold tracking-tight text-slate-900">TrackMyCalories</h1>
           </div>
           <div className="h-8 w-8 rounded-full bg-slate-100 border border-slate-200 overflow-hidden">
              <img 
