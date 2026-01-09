@@ -16,6 +16,13 @@ export interface FoodEntry {
   healthTip?: string;
   timestamp: number;
   imageUrl?: string;
+  source?: 'image' | 'text' | 'label' | 'water';
+}
+
+export interface UserProfile {
+  name: string;
+  streak: number;
+  lastLogDate: string; // YYYY-MM-DD
 }
 
 export interface AnalysisResult {

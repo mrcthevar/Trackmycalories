@@ -1,16 +1,22 @@
 import React, { useState, useRef } from 'react';
-import { Camera, X, Check, Loader2, Upload, Plus, Image as ImageIcon, Edit2, Droplets, Candy, Wheat } from 'lucide-react';
-import { analyzeFoodImage } from '../services/geminiService';
+import { Camera, X, Check, Loader2, Upload, Plus, Image as ImageIcon, Edit2, Droplets, Candy, Wheat, Type as TypeIcon, ScanBarcode, ArrowRight } from 'lucide-react';
+import { analyzeFoodImage, analyzeFoodText, analyzeNutritionLabel } from '../services/geminiService';
 import { FoodEntry, AnalysisResult } from '../types';
 
 interface AddFoodButtonProps {
   onAdd: (entry: FoodEntry) => void;
 }
 
+type InputMode = 'food-photo' | 'label-scan' | 'text' | null;
+
 const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [inputMode, setInputMode] = useState<InputMode>(null);
+  
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [textInput, setTextInput] = useState("");
+  
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [editedResult, setEditedResult] = useState<AnalysisResult | null>(null);
@@ -19,7 +25,9 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
   
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
+  const labelInputRef = useRef<HTMLInputElement>(null);
 
+  // --- Utilities ---
   const compressImage = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -31,8 +39,8 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
           const canvas = document.createElement('canvas');
           let width = img.width;
           let height = img.height;
-          const MAX_WIDTH = 800;
-          const MAX_HEIGHT = 800;
+          const MAX_WIDTH = 1000; // Increased for label readability
+          const MAX_HEIGHT = 1000;
 
           if (width > height) {
             if (width > MAX_WIDTH) {
@@ -55,7 +63,7 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
           }
           
           ctx.drawImage(img, 0, 0, width, height);
-          resolve(canvas.toDataURL('image/jpeg', 0.6));
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
         };
         img.onerror = (err) => reject(err);
       };
@@ -63,7 +71,8 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
     });
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  // --- Handlers ---
+  const handleFileSelection = async (e: React.ChangeEvent<HTMLInputElement>, mode: 'food-photo' | 'label-scan') => {
     const file = e.target.files?.[0];
     if (file) {
       try {
@@ -71,33 +80,56 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
         setIsMenuOpen(false);
         const compressedBase64 = await compressImage(file);
         setImagePreview(compressedBase64);
+        setInputMode(mode);
         setIsOpen(true);
         setResult(null);
         setEditedResult(null);
         setError(null);
+        setTextInput("");
       } catch (err) {
         console.error("Error processing image:", err);
-        alert("Failed to process image. Please try another photo.");
+        alert("Failed to process image.");
       } finally {
         setIsProcessing(false);
-        if (cameraInputRef.current) cameraInputRef.current.value = '';
-        if (galleryInputRef.current) galleryInputRef.current.value = '';
+        // Reset inputs
+        if (e.target) e.target.value = '';
       }
     }
   };
 
+  const handleTextMode = () => {
+    setIsMenuOpen(false);
+    setInputMode('text');
+    setIsOpen(true);
+    setResult(null);
+    setEditedResult(null);
+    setImagePreview(null);
+    setError(null);
+    setTextInput("");
+  };
+
   const handleAnalyze = async () => {
-    if (!imagePreview) return;
-    
     setIsAnalyzing(true);
     setError(null);
     
     try {
-      const analysis = await analyzeFoodImage(imagePreview);
+      let analysis: AnalysisResult;
+
+      if (inputMode === 'text') {
+        if (!textInput.trim()) throw new Error("Please enter a food description.");
+        analysis = await analyzeFoodText(textInput);
+      } else if (inputMode === 'label-scan' && imagePreview) {
+        analysis = await analyzeNutritionLabel(imagePreview);
+      } else if (inputMode === 'food-photo' && imagePreview) {
+        analysis = await analyzeFoodImage(imagePreview);
+      } else {
+        throw new Error("Invalid input state");
+      }
+
       setResult(analysis);
       setEditedResult(analysis);
     } catch (err: any) {
-      const errorMessage = err?.message || "Failed to analyze image. Please try again.";
+      const errorMessage = err?.message || "Failed to analyze. Please try again.";
       setError(errorMessage);
     } finally {
       setIsAnalyzing(false);
@@ -107,7 +139,7 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
   const handleSave = () => {
     const finalData = editedResult || result;
     
-    if (finalData && imagePreview) {
+    if (finalData) {
       const newEntry: FoodEntry = {
         id: Date.now().toString(),
         name: finalData.foodName,
@@ -123,7 +155,8 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
             water: Number(finalData.water || 0),
         },
         timestamp: Date.now(),
-        imageUrl: imagePreview
+        imageUrl: imagePreview || undefined,
+        source: inputMode === 'label-scan' ? 'label' : inputMode === 'text' ? 'text' : 'image'
       };
       onAdd(newEntry);
       resetAndClose();
@@ -137,6 +170,7 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
     setEditedResult(null);
     setIsAnalyzing(false);
     setError(null);
+    setInputMode(null);
   };
 
   const renderMacroInput = (label: string, field: keyof AnalysisResult, unit: string) => (
@@ -156,23 +190,46 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
 
   return (
     <>
-      <input type="file" ref={cameraInputRef} accept="image/*" capture="environment" className="hidden" onChange={handleFileChange} />
-      <input type="file" ref={galleryInputRef} accept="image/*" className="hidden" onChange={handleFileChange} />
+      <input type="file" ref={cameraInputRef} accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFileSelection(e, 'food-photo')} />
+      <input type="file" ref={galleryInputRef} accept="image/*" className="hidden" onChange={(e) => handleFileSelection(e, 'food-photo')} />
+      <input type="file" ref={labelInputRef} accept="image/*" className="hidden" onChange={(e) => handleFileSelection(e, 'label-scan')} />
 
-      {/* FAB */}
+      {/* FAB Menu */}
       <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+        
+        {/* Text Entry */}
         <div className={`transition-all duration-200 flex items-center gap-3 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
-             <span className="bg-white text-slate-700 text-xs font-semibold py-1 px-2 rounded-lg shadow-sm">Upload Photo</span>
-             <button onClick={() => galleryInputRef.current?.click()} disabled={isProcessing} className="h-12 w-12 bg-white text-indigo-600 rounded-full shadow-lg shadow-slate-200 flex items-center justify-center hover:bg-indigo-50 transition-colors">
-                <ImageIcon size={24} />
+             <span className="bg-white text-slate-700 text-xs font-semibold py-1 px-2 rounded-lg shadow-sm">Type it</span>
+             <button onClick={handleTextMode} disabled={isProcessing} className="h-10 w-10 bg-white text-indigo-600 rounded-full shadow-lg shadow-slate-200 flex items-center justify-center hover:bg-indigo-50 transition-colors">
+                <TypeIcon size={20} />
              </button>
         </div>
+
+        {/* Scan Label */}
+        <div className={`transition-all duration-200 flex items-center gap-3 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+             <span className="bg-white text-slate-700 text-xs font-semibold py-1 px-2 rounded-lg shadow-sm">Scan Label</span>
+             <button onClick={() => labelInputRef.current?.click()} disabled={isProcessing} className="h-10 w-10 bg-white text-indigo-600 rounded-full shadow-lg shadow-slate-200 flex items-center justify-center hover:bg-indigo-50 transition-colors">
+                <ScanBarcode size={20} />
+             </button>
+        </div>
+
+        {/* Upload */}
+        <div className={`transition-all duration-200 flex items-center gap-3 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+             <span className="bg-white text-slate-700 text-xs font-semibold py-1 px-2 rounded-lg shadow-sm">Upload</span>
+             <button onClick={() => galleryInputRef.current?.click()} disabled={isProcessing} className="h-10 w-10 bg-white text-indigo-600 rounded-full shadow-lg shadow-slate-200 flex items-center justify-center hover:bg-indigo-50 transition-colors">
+                <ImageIcon size={20} />
+             </button>
+        </div>
+
+        {/* Camera */}
         <div className={`transition-all duration-200 flex items-center gap-3 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 pointer-events-none'}`}>
-             <span className="bg-white text-slate-700 text-xs font-semibold py-1 px-2 rounded-lg shadow-sm">Take Picture</span>
-             <button onClick={() => cameraInputRef.current?.click()} disabled={isProcessing} className="h-12 w-12 bg-white text-indigo-600 rounded-full shadow-lg shadow-slate-200 flex items-center justify-center hover:bg-indigo-50 transition-colors">
-                <Camera size={24} />
+             <span className="bg-white text-slate-700 text-xs font-semibold py-1 px-2 rounded-lg shadow-sm">Snap Food</span>
+             <button onClick={() => cameraInputRef.current?.click()} disabled={isProcessing} className="h-10 w-10 bg-white text-indigo-600 rounded-full shadow-lg shadow-slate-200 flex items-center justify-center hover:bg-indigo-50 transition-colors">
+                <Camera size={20} />
              </button>
         </div>
+
+        {/* Main Button */}
         <button onClick={() => setIsMenuOpen(!isMenuOpen)} disabled={isProcessing} className={`h-16 w-16 bg-slate-900 text-white rounded-full shadow-xl shadow-slate-900/20 flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-200 ${isMenuOpen ? 'rotate-45' : 'rotate-0'}`}>
           {isProcessing ? <Loader2 className="animate-spin" size={28} /> : <Plus size={32} />}
         </button>
@@ -180,38 +237,73 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
       
       {isMenuOpen && <div className="fixed inset-0 bg-black/20 z-30 backdrop-blur-[1px]" onClick={() => setIsMenuOpen(false)} />}
 
+      {/* Main Modal */}
       {isOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 transition-opacity animate-in fade-in duration-200">
           <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-10 duration-300 max-h-[90vh] overflow-y-auto">
             
             <div className="p-4 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
-              <h3 className="font-semibold text-slate-800">New Entry</h3>
+              <h3 className="font-semibold text-slate-800">
+                {inputMode === 'text' ? 'Log by Text' : inputMode === 'label-scan' ? 'Scan Label' : 'New Food Entry'}
+              </h3>
               <button onClick={resetAndClose} className="p-2 hover:bg-slate-100 rounded-full">
                 <X size={20} className="text-slate-500" />
               </button>
             </div>
 
             <div className="p-6">
-              <div className="aspect-square w-full bg-slate-100 rounded-2xl overflow-hidden mb-6 relative group shadow-inner">
-                {imagePreview && <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />}
-                {!result && !isAnalyzing && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                         <button onClick={() => { setIsMenuOpen(true); setIsOpen(false); }} className="bg-white/90 text-slate-800 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 shadow-sm hover:bg-white">
-                            <Upload size={16} /> Change Photo
-                        </button>
-                    </div>
-                )}
-              </div>
-
-              {isAnalyzing && (
-                <div className="flex flex-col items-center justify-center py-4 space-y-3">
-                  <Loader2 className="animate-spin text-indigo-600" size={32} />
-                  <p className="text-slate-500 text-sm font-medium animate-pulse">Consulting Food Scientist...</p>
+              
+              {/* Image Preview Area */}
+              {(inputMode === 'food-photo' || inputMode === 'label-scan') && (
+                <div className="aspect-square w-full bg-slate-100 rounded-2xl overflow-hidden mb-6 relative group shadow-inner">
+                    {imagePreview && <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />}
+                    {!result && !isAnalyzing && (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => { 
+                                if(inputMode === 'label-scan') labelInputRef.current?.click();
+                                else setIsMenuOpen(true); 
+                            }} className="bg-white/90 text-slate-800 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 shadow-sm hover:bg-white">
+                                <Upload size={16} /> Retake
+                            </button>
+                        </div>
+                    )}
                 </div>
               )}
 
+              {/* Text Input Area */}
+              {inputMode === 'text' && !result && (
+                  <div className="mb-6">
+                      <label className="block text-sm font-medium text-slate-700 mb-2">What did you eat?</label>
+                      <textarea 
+                        value={textInput}
+                        onChange={(e) => setTextInput(e.target.value)}
+                        placeholder="e.g., A large avocado toast with 2 poached eggs and a latte"
+                        className="w-full p-4 rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:ring-2 focus:ring-indigo-100 focus:border-indigo-400 outline-none resize-none text-slate-800"
+                        rows={4}
+                        autoFocus
+                      />
+                  </div>
+              )}
+
+              {/* Loading State */}
+              {isAnalyzing && (
+                <div className="flex flex-col items-center justify-center py-8 space-y-4">
+                  <div className="relative">
+                      <div className="absolute inset-0 bg-indigo-100 rounded-full animate-ping opacity-75"></div>
+                      <div className="relative bg-white p-3 rounded-full shadow-sm border border-indigo-100">
+                        <Loader2 className="animate-spin text-indigo-600" size={32} />
+                      </div>
+                  </div>
+                  <p className="text-slate-500 text-sm font-medium animate-pulse">
+                    {inputMode === 'label-scan' ? 'Reading nutrition facts...' : 'Analyzing nutritional data...'}
+                  </p>
+                </div>
+              )}
+
+              {/* Error Message */}
               {error && <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm text-center mb-4 border border-red-100">{error}</div>}
 
+              {/* Result Editor */}
               {result && editedResult && (
                 <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 mb-6">
                     {/* Header: Name and Cals */}
@@ -319,23 +411,30 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
                              </div>
                         </div>
                     )}
-
-                    <div className="text-center mt-3">
-                        <span className="text-[10px] text-slate-400 flex items-center justify-center gap-1">
-                            <Edit2 size={10} /> Tap values to edit analysis
-                        </span>
-                    </div>
                 </div>
               )}
 
+              {/* Action Buttons */}
               {!result ? (
-                <button onClick={handleAnalyze} disabled={isAnalyzing} className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white font-semibold py-4 rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2">
-                  {isAnalyzing ? 'Analyzing...' : 'Analyze Photo'}
+                <button 
+                    onClick={handleAnalyze} 
+                    disabled={isAnalyzing || (inputMode === 'text' && !textInput.trim())}
+                    className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-semibold py-4 rounded-xl shadow-lg shadow-indigo-200 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
+                >
+                  {isAnalyzing ? 'Processing...' : (
+                      <>
+                        {inputMode === 'text' && 'Analyze Text'}
+                        {inputMode === 'label-scan' && 'Extract Data'}
+                        {inputMode === 'food-photo' && 'Analyze Photo'}
+                        {!inputMode && 'Select an option'}
+                        <ArrowRight size={20} />
+                      </>
+                  )}
                 </button>
               ) : (
                 <button onClick={handleSave} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-semibold py-4 rounded-xl shadow-lg transition-all active:scale-[0.98] flex items-center justify-center gap-2">
                   <Check size={20} />
-                  Confirm & Log Food
+                  Confirm & Log
                 </button>
               )}
             </div>
