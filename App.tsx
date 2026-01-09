@@ -14,8 +14,13 @@ const DAILY_CALORIE_GOAL = 2500;
 const App: React.FC = () => {
   // --- State: User Profile ---
   const [userProfile, setUserProfile] = useState<UserProfile | null>(() => {
-    const saved = localStorage.getItem('trackmycalories_profile');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('trackmycalories_profile');
+      return saved ? JSON.parse(saved) : null;
+    } catch (e) {
+      console.error("Error parsing user profile from storage", e);
+      return null;
+    }
   });
 
   // --- State: View Navigation ---
@@ -55,13 +60,17 @@ const App: React.FC = () => {
     try {
       localStorage.setItem('trackmycalories_entries', JSON.stringify(entries));
     } catch (e) {
-      console.error("LocalStorage quota exceeded or error saving", e);
+      console.error("LocalStorage quota exceeded or error saving entries", e);
     }
   }, [entries]);
 
   useEffect(() => {
     if (userProfile) {
-      localStorage.setItem('trackmycalories_profile', JSON.stringify(userProfile));
+      try {
+        localStorage.setItem('trackmycalories_profile', JSON.stringify(userProfile));
+      } catch (e) {
+        console.error("Error saving profile to storage", e);
+      }
     }
   }, [userProfile]);
 
@@ -76,6 +85,17 @@ const App: React.FC = () => {
     if (userProfile.lastLogDate === todayStr) return;
 
     const lastLog = new Date(userProfile.lastLogDate);
+    
+    // Check if lastLog is invalid (e.g. empty string from initial state)
+    if (isNaN(lastLog.getTime())) {
+        setUserProfile({
+            ...userProfile,
+            lastLogDate: todayStr,
+            streak: 1
+        });
+        return;
+    }
+
     const diffTime = Math.abs(entryDate.getTime() - lastLog.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
 
@@ -117,6 +137,14 @@ const App: React.FC = () => {
         streak: 0,
         lastLogDate: ''
     };
+    
+    // Save immediately to ensure persistence
+    try {
+        localStorage.setItem('trackmycalories_profile', JSON.stringify(newProfile));
+    } catch (e) {
+        console.error("Failed to save profile", e);
+    }
+    
     setUserProfile(newProfile);
   };
 
