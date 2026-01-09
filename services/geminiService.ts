@@ -1,9 +1,48 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { AnalysisResult } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Helper function to safely get the API key from various environments
+const getApiKey = (): string | undefined => {
+  // 1. Check Vite (import.meta.env) - Common in modern React
+  try {
+    // @ts-ignore
+    if (typeof import.meta !== 'undefined' && import.meta.env) {
+      // @ts-ignore
+      if (import.meta.env.VITE_API_KEY) return import.meta.env.VITE_API_KEY;
+      // @ts-ignore
+      if (import.meta.env.API_KEY) return import.meta.env.API_KEY;
+    }
+  } catch (e) {
+    // Ignore errors if import.meta is not supported
+  }
+
+  // 2. Check process.env - Common in CRA / Webpack / Node
+  try {
+    if (typeof process !== 'undefined' && process.env) {
+      if (process.env.REACT_APP_API_KEY) return process.env.REACT_APP_API_KEY;
+      if (process.env.VITE_API_KEY) return process.env.VITE_API_KEY;
+      if (process.env.API_KEY) return process.env.API_KEY;
+    }
+  } catch (e) {
+    // Ignore errors if process is not defined
+  }
+
+  return undefined;
+};
 
 export const analyzeFoodImage = async (base64Image: string): Promise<AnalysisResult> => {
+  const apiKey = getApiKey();
+
+  // Check for API key availability
+  if (!apiKey) {
+    throw new Error(
+      "API Key is missing. If on Cloudflare, add 'VITE_API_KEY' to Settings > Environment Variables."
+    );
+  }
+
+  // Initialize client lazily with the retrieved key
+  const ai = new GoogleGenAI({ apiKey: apiKey });
+
   try {
     // Strip the data URL prefix if present to get just the base64 string
     const base64Data = base64Image.replace(/^data:image\/(png|jpeg|jpg|webp);base64,/, "");
