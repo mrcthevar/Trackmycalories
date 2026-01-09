@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Camera, X, Check, Loader2, Upload } from 'lucide-react';
+import { Camera, X, Check, Loader2, Upload, Plus, Image as ImageIcon } from 'lucide-react';
 import { analyzeFoodImage } from '../services/geminiService';
 import { FoodEntry, AnalysisResult } from '../types';
 
@@ -8,13 +8,16 @@ interface AddFoodButtonProps {
 }
 
 const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false); // Controls the Modal
+  const [isMenuOpen, setIsMenuOpen] = useState(false); // Controls the FAB menu
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   // Helper to compress image
   const compressImage = (file: File): Promise<string> => {
@@ -67,6 +70,7 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
     if (file) {
       try {
         setIsProcessing(true);
+        setIsMenuOpen(false); // Close menu after selection
         const compressedBase64 = await compressImage(file);
         setImagePreview(compressedBase64);
         setIsOpen(true);
@@ -78,6 +82,9 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
         alert("Failed to process image. Please try another photo.");
       } finally {
         setIsProcessing(false);
+        // Reset inputs so the same file can be selected again if needed
+        if (cameraInputRef.current) cameraInputRef.current.value = '';
+        if (galleryInputRef.current) galleryInputRef.current.value = '';
       }
     }
   };
@@ -92,7 +99,6 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
       const analysis = await analyzeFoodImage(imagePreview);
       setResult(analysis);
     } catch (err: any) {
-      // Show the actual error message if available (helps with API Key debugging)
       const errorMessage = err?.message || "Failed to analyze image. Please try again.";
       setError(errorMessage);
     } finally {
@@ -126,38 +132,81 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
     setResult(null);
     setIsAnalyzing(false);
     setError(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   return (
     <>
-      {/* Hidden File Input */}
+      {/* Hidden Inputs */}
       <input
         type="file"
-        ref={fileInputRef}
+        ref={cameraInputRef}
         accept="image/*"
-        capture="environment" // Prefers camera on mobile
+        capture="environment" // Forces Camera
+        className="hidden"
+        onChange={handleFileChange}
+      />
+       <input
+        type="file"
+        ref={galleryInputRef}
+        accept="image/*"
+        // No capture attribute allows Gallery selection
         className="hidden"
         onChange={handleFileChange}
       />
 
-      {/* Floating Action Button */}
-      <button
-        onClick={() => fileInputRef.current?.click()}
-        disabled={isProcessing}
-        className="fixed bottom-6 right-6 h-16 w-16 bg-slate-900 text-white rounded-full shadow-lg shadow-slate-900/30 flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-200 z-40 disabled:opacity-70 disabled:scale-100"
-        aria-label="Add Food"
-      >
-        {isProcessing ? <Loader2 className="animate-spin" size={28} /> : <Camera size={28} />}
-      </button>
+      {/* Floating Action Menu */}
+      <div className="fixed bottom-6 right-6 z-40 flex flex-col items-end gap-3">
+        
+        {/* Gallery Option */}
+        <div className={`transition-all duration-200 flex items-center gap-3 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
+             <span className="bg-white text-slate-700 text-xs font-semibold py-1 px-2 rounded-lg shadow-sm">Upload Photo</span>
+             <button
+                onClick={() => galleryInputRef.current?.click()}
+                disabled={isProcessing}
+                className="h-12 w-12 bg-white text-indigo-600 rounded-full shadow-lg shadow-slate-200 flex items-center justify-center hover:bg-indigo-50 transition-colors"
+             >
+                <ImageIcon size={24} />
+             </button>
+        </div>
 
-      {/* Modal Overlay */}
+        {/* Camera Option */}
+        <div className={`transition-all duration-200 flex items-center gap-3 ${isMenuOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-5 pointer-events-none'}`}>
+             <span className="bg-white text-slate-700 text-xs font-semibold py-1 px-2 rounded-lg shadow-sm">Take Picture</span>
+             <button
+                onClick={() => cameraInputRef.current?.click()}
+                disabled={isProcessing}
+                className="h-12 w-12 bg-white text-indigo-600 rounded-full shadow-lg shadow-slate-200 flex items-center justify-center hover:bg-indigo-50 transition-colors"
+             >
+                <Camera size={24} />
+             </button>
+        </div>
+
+        {/* Main Toggle Button */}
+        <button
+          onClick={() => setIsMenuOpen(!isMenuOpen)}
+          disabled={isProcessing}
+          className={`h-16 w-16 bg-slate-900 text-white rounded-full shadow-xl shadow-slate-900/20 flex items-center justify-center hover:scale-105 active:scale-95 transition-all duration-200 ${isMenuOpen ? 'rotate-45' : 'rotate-0'}`}
+          aria-label="Add Food"
+        >
+          {isProcessing ? <Loader2 className="animate-spin" size={28} /> : <Plus size={32} />}
+        </button>
+      </div>
+      
+      {/* Backdrop for Menu */}
+      {isMenuOpen && (
+        <div 
+            className="fixed inset-0 bg-black/20 z-30 backdrop-blur-[1px]" 
+            onClick={() => setIsMenuOpen(false)}
+        />
+      )}
+
+      {/* Analysis Modal Overlay */}
       {isOpen && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-4 transition-opacity animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-10 duration-300">
+          <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in slide-in-from-bottom-10 duration-300 max-h-[90vh] overflow-y-auto">
             
             {/* Header */}
-            <div className="p-4 border-b border-slate-100 flex justify-between items-center">
+            <div className="p-4 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
               <h3 className="font-semibold text-slate-800">Add Entry</h3>
               <button onClick={resetAndClose} className="p-2 hover:bg-slate-100 rounded-full">
                 <X size={20} className="text-slate-500" />
@@ -167,15 +216,18 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
             {/* Content */}
             <div className="p-6">
               {/* Image Preview */}
-              <div className="aspect-square w-full bg-slate-100 rounded-2xl overflow-hidden mb-6 relative group">
+              <div className="aspect-square w-full bg-slate-100 rounded-2xl overflow-hidden mb-6 relative group shadow-inner">
                 {imagePreview && (
                   <img src={imagePreview} alt="Preview" className="w-full h-full object-cover" />
                 )}
                 {!result && !isAnalyzing && (
                     <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity">
                          <button 
-                            onClick={() => fileInputRef.current?.click()} 
-                            className="bg-white/90 text-slate-800 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 shadow-sm"
+                            onClick={() => {
+                                setIsMenuOpen(true);
+                                setIsOpen(false);
+                            }} 
+                            className="bg-white/90 text-slate-800 px-4 py-2 rounded-full text-sm font-medium flex items-center gap-2 shadow-sm hover:bg-white"
                         >
                             <Upload size={16} /> Change Photo
                         </button>
@@ -192,7 +244,7 @@ const AddFoodButton: React.FC<AddFoodButtonProps> = ({ onAdd }) => {
               )}
 
               {error && (
-                <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm text-center mb-4 break-words">
+                <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm text-center mb-4 break-words border border-red-100">
                   {error}
                 </div>
               )}
