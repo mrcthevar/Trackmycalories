@@ -11,12 +11,12 @@ const FOOD_ANALYSIS_SCHEMA = {
       items: {
         type: Type.OBJECT,
         properties: {
-          name: { type: Type.STRING, description: "Common name of the Indian food item" },
-          portion: { type: Type.STRING, description: "Estimated portion size (e.g., 1 bowl, 2 roti)" },
-          calories: { type: Type.NUMBER, description: "Estimated calories" },
-          protein: { type: Type.NUMBER, description: "Estimated protein in grams" },
-          carbs: { type: Type.NUMBER, description: "Estimated carbs in grams" },
-          fats: { type: Type.NUMBER, description: "Estimated fats in grams" },
+          name: { type: Type.STRING },
+          portion: { type: Type.STRING },
+          calories: { type: Type.NUMBER },
+          protein: { type: Type.NUMBER },
+          carbs: { type: Type.NUMBER },
+          fats: { type: Type.NUMBER },
         },
         required: ["name", "portion", "calories", "protein", "carbs", "fats"],
       },
@@ -44,12 +44,13 @@ export async function analyzeFoodImage(base64Image: string): Promise<FoodItem[]>
       ],
       config: {
         responseMimeType: "application/json",
-        responseSchema: FOOD_ANALYSIS_SCHEMA,
+        responseSchema: FOOD_ANALYSIS_SCHEMA as any,
       },
     });
 
-    const result = JSON.parse(response.text || '{"items": []}');
-    return result.items.map((item: any) => ({
+    const text = response.text || '{"items": []}';
+    const parsed = JSON.parse(text);
+    return (parsed.items || []).map((item: any) => ({
       ...item,
       id: Math.random().toString(36).substr(2, 9),
     }));
