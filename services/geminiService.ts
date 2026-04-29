@@ -1,7 +1,9 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { FoodItem } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const ai = new GoogleGenAI({ 
+  apiKey: process.env.GEMINI_API_KEY || "" 
+});
 
 const FOOD_ANALYSIS_SCHEMA = {
   type: Type.OBJECT,
@@ -28,7 +30,7 @@ const FOOD_ANALYSIS_SCHEMA = {
 export async function analyzeFoodImage(base64Image: string): Promise<FoodItem[]> {
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-flash-latest",
+      model: "gemini-3-flash-preview",
       contents: {
         parts: [
           { text: "Analyze this image of Indian food. Detect all food items and estimate their calories and macronutrients (protein, carbs, fats) based on the portion sizes visible. Return a list of items." },
@@ -48,6 +50,7 @@ export async function analyzeFoodImage(base64Image: string): Promise<FoodItem[]>
 
     const text = response.text || '{"items": []}';
     const parsed = JSON.parse(text);
+    
     return (parsed.items || []).map((item: any) => ({
       ...item,
       id: Math.random().toString(36).substr(2, 9),
