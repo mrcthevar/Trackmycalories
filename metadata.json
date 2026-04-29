@@ -1,7 +1,8 @@
 {
-  "name": "Trackmycalories",
-  "description": "A smart calorie tracker that estimates nutrition from food photos using Gemini AI.",
+  "name": "Annam",
+  "description": "AI-powered calorie tracking for Indian food. Identify meals from photos and track your daily intake.",
   "requestFramePermissions": [
     "camera"
-  ]
+  ],
+  "majorCapabilities": []
 }
